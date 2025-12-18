@@ -7,7 +7,7 @@ import (
 	"edge-proxy/server/internal/config"
 	"edge-proxy/server/internal/proxy"
 	"edge-proxy/server/internal/server"
-	edgetls "edge-proxy/server/internal/tls"
+	"edge-proxy/server/internal/tls"
 )
 
 func main() {
@@ -18,7 +18,7 @@ func main() {
 	}
 
 	// ACME / TLS manager
-	tlsManager := edgetls.NewManager(
+	tlsManager := tls.NewManager(
 		cfg.TLS.CacheDir,
 		cfg.TLS.Domains,
 	)
