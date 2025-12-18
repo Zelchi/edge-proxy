@@ -1,0 +1,18 @@
+http:
+  address: ":80"
+  redirect_to_https: true
+
+https:
+  address: ":443"
+
+tls:
+  cache_dir: /app/certs
+  domains:
+    - saas1.com
+    - saas2.com
+
+routes:
+  - host: saas1.com
+    upstream: http://app-servico-1:3001
+  - host: saas2.com
+    upstream: http://app-servico-2:3002
