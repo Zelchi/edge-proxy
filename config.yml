@@ -8,11 +8,16 @@ https:
 tls:
   cache_dir: /app/certs
   domains:
-    - saas1.com
-    - saas2.com
+    - zelchi.com
+    - pesquisa.zelchi.com
+    - envolve.zelchi.com
 
 routes:
-  - host: saas1.com
-    upstream: http://app-servico-1:3001
-  - host: saas2.com
-    upstream: http://app-servico-2:3002
+  - host: zelchi.com
+    upstream: http://zelchi-blog:3001
+
+  - host: pesquisa.zelchi.com
+    upstream: http://pesquisa-hardware:3002
+
+  - host: envolve.zelchi.com
+    upstream: http://envolve-dev:3003

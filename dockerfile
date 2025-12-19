@@ -7,13 +7,13 @@ RUN go mod download
 
 COPY ./internal ./
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o edge ./main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o main ./main.go
 
 FROM alpine:3.19
 
 WORKDIR /app
 
 RUN apk add --no-cache ca-certificates
-COPY --from=builder /app/edge .
+COPY --from=builder /app/main .
 
-ENTRYPOINT ["/app/edge"]
+ENTRYPOINT ["/app/main"]
