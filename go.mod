@@ -1,4 +1,4 @@
-module edge-proxy/server
+module edge-proxy
 
 go 1.25.5
 

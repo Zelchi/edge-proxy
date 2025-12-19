@@ -4,10 +4,10 @@ import (
 	"log"
 	"net/http"
 
-	"edge-proxy/server/internal/config"
-	"edge-proxy/server/internal/proxy"
-	"edge-proxy/server/internal/server"
-	"edge-proxy/server/internal/tls"
+	"edge-proxy/internal/config"
+	"edge-proxy/internal/proxy"
+	"edge-proxy/internal/server"
+	"edge-proxy/internal/tls"
 )
 
 func main() {
