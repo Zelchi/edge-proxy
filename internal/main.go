@@ -12,6 +12,7 @@ import (
 
 func main() {
 
+	// Load configs
 	cfg, err := config.Load("config.yml")
 	if err != nil {
 		log.Fatal(err)
@@ -42,6 +43,13 @@ func main() {
 		w.WriteHeader(http.StatusNotFound)
 	})
 
+	// HTTPS
+	srv := server.New(cfg.HTTPS.Address, handler)
+	srv.TLSConfig = tlsManager.TLSConfig()
+
+	log.Fatal(srv.ListenAndServeTLS("", ""))
+
+	// Start servers
 	go func() {
 		log.Fatal(
 			http.ListenAndServe(
@@ -50,10 +58,4 @@ func main() {
 			),
 		)
 	}()
-
-	// HTTPS
-	srv := server.New(cfg.HTTPS.Address, handler)
-	srv.TLSConfig = tlsManager.TLSConfig()
-
-	log.Fatal(srv.ListenAndServeTLS("", ""))
 }
