@@ -34,13 +34,19 @@ func main() {
 	handler := limiter.Middleware(router)
 
 	// HTTP -> HTTPS redirect
+	httpHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if cfg.HTTP.RedirectToHTTPS {
+			http.Redirect(w, r, "https://"+r.Host+r.RequestURI, http.StatusMovedPermanently)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+
 	go func() {
 		log.Fatal(
 			http.ListenAndServe(
 				cfg.HTTP.Address,
-				tlsManager.HTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					http.Redirect(w, r, "https://"+r.Host+r.RequestURI, http.StatusMovedPermanently)
-				})),
+				tlsManager.HTTPHandler(httpHandler),
 			),
 		)
 	}()
