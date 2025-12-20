@@ -16,3 +16,5 @@ Edge Proxy é um reverse proxy / edge server escrito em Go, com foco em simplici
 ```bash
 docker network create proxy_network
 ```
+
+Configure pelo config.yml, caso troque as configurações reinicie o container.
