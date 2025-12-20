@@ -17,7 +17,7 @@ type HTTPSConfig struct {
 }
 
 type TLSConfig struct {
-	CacheDir string   `yaml:"cache_dir"`
+	CertsDir string   `yaml:"certs_dir"`
 	Domains  []string `yaml:"domains"`
 }
 

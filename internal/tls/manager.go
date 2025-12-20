@@ -11,12 +11,12 @@ type Manager struct {
 	autocert *autocert.Manager
 }
 
-func NewManager(cache string, domains []string) *Manager {
+func NewManager(certs string, domains []string) *Manager {
 	return &Manager{
 		autocert: &autocert.Manager{
 			Prompt:     autocert.AcceptTOS,
 			HostPolicy: autocert.HostWhitelist(domains...),
-			Cache:      autocert.DirCache(cache),
+			Cache:      autocert.DirCache(certs),
 		},
 	}
 }

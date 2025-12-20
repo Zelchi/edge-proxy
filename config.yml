@@ -6,7 +6,7 @@ https:
   address: ":443"
 
 tls:
-  cache_dir: /app/certs
+  certs_dir: /app/certs
   domains:
     - zelchi.com
     - pesquisa.zelchi.com

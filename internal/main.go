@@ -19,7 +19,7 @@ func main() {
 
 	// ACME / TLS manager
 	tlsManager := tls.NewManager(
-		cfg.TLS.CacheDir,
+		cfg.TLS.CertsDir,
 		cfg.TLS.Domains,
 	)
 
