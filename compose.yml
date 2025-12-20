@@ -7,7 +7,7 @@ services:
       dockerfile: dockerfile
     container_name: edge-proxy
     networks:
-      - rede_zelchi
+      - proxy_network
     restart: unless-stopped
     ports:
       - "80:80"
@@ -20,5 +20,5 @@ volumes:
   certs:
 
 networks:
-  rede_zelchi:
+  proxy_network:
     external: true
