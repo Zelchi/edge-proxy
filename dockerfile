@@ -16,4 +16,4 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates
 COPY --from=builder /app .
 
-ENTRYPOINT ["/app"]
+ENTRYPOINT ["/app/main"]

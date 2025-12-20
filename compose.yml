@@ -14,7 +14,7 @@ services:
       - "443:443"
     volumes:
       - certs:/app/certs
-      - ./config.yml:/app/config.yml:ro
+      - ./config.yml:/app/config.yml:Z
 
 volumes:
   certs:
