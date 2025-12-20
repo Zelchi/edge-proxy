@@ -43,13 +43,7 @@ func main() {
 		w.WriteHeader(http.StatusNotFound)
 	})
 
-	// HTTPS
-	srv := server.New(cfg.HTTPS.Address, handler)
-	srv.TLSConfig = tlsManager.TLSConfig()
-
-	log.Fatal(srv.ListenAndServeTLS("", ""))
-
-	// Start servers
+	// HTTP server
 	go func() {
 		log.Fatal(
 			http.ListenAndServe(
@@ -58,4 +52,9 @@ func main() {
 			),
 		)
 	}()
+
+	// HTTPS server
+	srv := server.New(cfg.HTTPS.Address, handler)
+	srv.TLSConfig = tlsManager.TLSConfig()
+	log.Fatal(srv.ListenAndServeTLS("", ""))
 }
