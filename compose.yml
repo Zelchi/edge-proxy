@@ -1,22 +1,18 @@
 services:
   edge-proxy:
+    container_name: edge-proxy
+    restart: unless-stopped
     build:
       context: .
       dockerfile: dockerfile
-    container_name: edge-proxy
-    networks:
-      - proxy_network
-    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - certs:/app/certs
       - ./config.yml:/app/config.yml:Z
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   certs:
-
-networks:
-  proxy_network:
-    external: true

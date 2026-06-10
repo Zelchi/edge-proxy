@@ -31,7 +31,7 @@ func main() {
 	}
 
 	// Rate limit
-	limiter := proxy.NewLimiter(10, 20)
+	limiter := proxy.NewLimiter(300, 300)
 	handler := limiter.Middleware(router)
 
 	// HTTP -> HTTPS redirect

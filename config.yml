@@ -8,16 +8,8 @@ https:
 tls:
   certs_dir: /app/certs
   domains:
-    - zelchi.com
-    - pesquisa.zelchi.com
-    - envolve.zelchi.com
+    - vtt.zelchi.com
 
 routes:
-  - host: zelchi.com
-    upstream: http://zelchi-blog:3001
-
-  - host: pesquisa.zelchi.com
-    upstream: http://pesquisa-hardware:3002
-
-  - host: envolve.zelchi.com
-    upstream: http://envolve-dev:3003
+  - host: vtt.zelchi.com
+    upstream: http://host.docker.internal:9333
