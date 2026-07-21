@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"edge-proxy/internal/proxy"
 )
@@ -48,15 +49,19 @@ func serveMetricsStream(w http.ResponseWriter, r *http.Request, metrics *proxy.M
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	controller := http.NewResponseController(w)
-	subscription, unsubscribe := metrics.Subscribe()
-	defer unsubscribe()
+	send := func() error {
+		data, err := json.Marshal(metrics.Snapshot())
+		if err != nil { return err }
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil { return err }
+		return controller.Flush()
+	}
+	if err := send(); err != nil { return }
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 	for {
 		select {
-		case snapshot := <-subscription:
-			data, err := json.Marshal(snapshot)
-			if err != nil { return }
-			if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil { return }
-			if err := controller.Flush(); err != nil { return }
+		case <-ticker.C:
+			if err := send(); err != nil { return }
 		case <-r.Context().Done():
 			return
 		}
