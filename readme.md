@@ -33,7 +33,7 @@ tls:
 # Opcional: hosts sem rota são redirecionados para este domínio.
 fallback:
   host: app.exemplo.com
-  status_code: 308
+  status_code: 302
 
 routes:
   - host: app.exemplo.com

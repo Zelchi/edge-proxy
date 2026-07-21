@@ -20,7 +20,7 @@ dashboard:
 
 fallback:
   host: solar.zelchi.com
-  status_code: 308
+  status_code: 302
 
 routes:
   - host: vtt.zelchi.com

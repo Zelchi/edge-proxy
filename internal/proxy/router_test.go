@@ -73,8 +73,8 @@ func TestRouterRedirectsUnknownHostToFallback(t *testing.T) {
 
 	router.ServeHTTP(response, req)
 
-	if response.Code != http.StatusPermanentRedirect {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusPermanentRedirect)
+	if response.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusFound)
 	}
 	if location := response.Header().Get("Location"); location != "https://fallback.example/docs?lang=pt" {
 		t.Fatalf("Location = %q, want fallback URL with path and query", location)

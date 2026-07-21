@@ -141,7 +141,7 @@ func redirectToFallback(w http.ResponseWriter, req *http.Request, fallback Fallb
 	switch status {
 	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
 	default:
-		status = http.StatusPermanentRedirect
+		status = http.StatusFound
 	}
 
 	target := url.URL{
@@ -151,5 +151,6 @@ func redirectToFallback(w http.ResponseWriter, req *http.Request, fallback Fallb
 		RawPath:  req.URL.RawPath,
 		RawQuery: req.URL.RawQuery,
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	http.Redirect(w, req, target.String(), status)
 }
