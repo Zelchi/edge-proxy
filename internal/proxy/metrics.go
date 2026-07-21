@@ -3,6 +3,7 @@ package proxy
 import (
 	"io"
 	"net/http"
+	"sync"
 	"sync/atomic"
 )
 
@@ -11,6 +12,8 @@ type Metrics struct {
 	errors   atomic.Uint64
 	inBytes  atomic.Uint64
 	outBytes atomic.Uint64
+	mu       sync.Mutex
+	subscribers map[chan MetricsSnapshot]struct{}
 }
 
 type MetricsSnapshot struct {
@@ -22,6 +25,36 @@ type MetricsSnapshot struct {
 
 func (m *Metrics) Snapshot() MetricsSnapshot {
 	return MetricsSnapshot{m.requests.Load(), m.errors.Load(), m.inBytes.Load(), m.outBytes.Load()}
+}
+
+func (m *Metrics) Subscribe() (<-chan MetricsSnapshot, func()) {
+	channel := make(chan MetricsSnapshot, 1)
+	m.mu.Lock()
+	if m.subscribers == nil {
+		m.subscribers = make(map[chan MetricsSnapshot]struct{})
+	}
+	m.subscribers[channel] = struct{}{}
+	channel <- m.Snapshot()
+	m.mu.Unlock()
+	return channel, func() {
+		m.mu.Lock()
+		delete(m.subscribers, channel)
+		m.mu.Unlock()
+	}
+}
+
+func (m *Metrics) publish() {
+	snapshot := m.Snapshot()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for channel := range m.subscribers {
+		select {
+		case channel <- snapshot:
+		default:
+			select { case <-channel: default: }
+			channel <- snapshot
+		}
+	}
 }
 
 func WithMetrics(metrics *Metrics, next http.Handler) http.Handler {
@@ -36,6 +69,7 @@ func WithMetrics(metrics *Metrics, next http.Handler) http.Handler {
 		if recorder.status >= http.StatusInternalServerError {
 			metrics.errors.Add(1)
 		}
+		metrics.publish()
 	})
 }
 
