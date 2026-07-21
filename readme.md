@@ -107,6 +107,13 @@ upstream; a query da requisição do cliente é preservada.
 `GET /healthz` responde `200 ok` em HTTP ou HTTPS sem expor configuração ou
 estado interno. Use-o para liveness/readiness no Docker ou no balanceador.
 
+### Dashboard
+
+O host definido em `dashboard.host` serve uma página somente leitura com
+requisições, erros 5xx e transferência de entrada/saída. Acesse o host
+configurado em `dashboard.host`; a API de métricas fica em `GET /api/metrics` e
+não aceita métodos de alteração.
+
 ### Imagem Docker
 
 A imagem já inclui o `config.yml` presente no build e pode ser executada sem

@@ -56,7 +56,8 @@ func main() {
 		log.Printf("[REQUEST] %s %s Host=%s", r.Method, r.URL.Path, r.Host)
 		router.ServeHTTP(w, r)
 	}))
-	handler := proxy.WithMetrics(metrics, proxy.WithAccessLog(slog.Default(), server.WithHealth(applicationHandler)))
+	dashboardHandler := server.WithDashboard(cfg.Dashboard.Host, metrics, applicationHandler)
+	handler := proxy.WithMetrics(metrics, proxy.WithAccessLog(slog.Default(), server.WithHealth(dashboardHandler)))
 
 	httpsHandler := handler
 	http3Server := server.NewHTTP3(server.DefaultHTTP3Address, handler, tlsManager.TLSConfig())
@@ -78,6 +79,10 @@ func main() {
 	httpHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == server.HealthPath {
 			handler.ServeHTTP(w, r)
+			return
+		}
+		if server.IsDashboardHost(cfg.Dashboard.Host, r.Host) {
+			http.Redirect(w, r, "https://"+r.Host+r.URL.RequestURI(), http.StatusMovedPermanently)
 			return
 		}
 		log.Printf("[HTTP] Processando %s%s", r.Host, r.RequestURI)
