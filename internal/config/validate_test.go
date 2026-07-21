@@ -92,6 +92,9 @@ https:
 tls:
   certs_dir: /tmp/certs
   domains: ["APP.EXAMPLE."]
+rate_limit:
+  requests_per_second: 1000
+  burst: 2000
 routes:
   - host: "APP.EXAMPLE."
     upstream: http://upstream.example:8080
@@ -122,6 +125,7 @@ func validConfig() Config {
 			Domains:  []string{"app.example"},
 		},
 		Dashboard: DashboardConfig{Host: "app.example"},
+		RateLimit: RateLimitConfig{RequestsPerSecond: 1000, Burst: 2000},
 		Routes:    []Route{{Host: "app.example", Upstream: "http://upstream.example:8080"}},
 	}
 }

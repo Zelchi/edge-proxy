@@ -15,7 +15,7 @@ func TestWithDashboardServesConfiguredHost(t *testing.T) {
 	request.Host = "info.example:443"
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
-	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Uso de rede") {
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Requisições") {
 		t.Fatalf("dashboard response = %d %q", response.Code, response.Body.String())
 	}
 }

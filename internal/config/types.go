@@ -4,6 +4,7 @@ type Config struct {
 	HTTP      HTTPConfig      `yaml:"http"`
 	HTTPS     HTTPSConfig     `yaml:"https"`
 	TLS       TLSConfig       `yaml:"tls"`
+	RateLimit RateLimitConfig `yaml:"rate_limit"`
 	Dashboard DashboardConfig `yaml:"dashboard"`
 	Routes    []Route         `yaml:"routes"`
 	Fallback  FallbackConfig  `yaml:"fallback"`
@@ -21,6 +22,11 @@ type HTTPSConfig struct {
 type TLSConfig struct {
 	CertsDir string   `yaml:"certs_dir"`
 	Domains  []string `yaml:"domains"`
+}
+
+type RateLimitConfig struct {
+	RequestsPerSecond float64 `yaml:"requests_per_second"`
+	Burst             int     `yaml:"burst"`
 }
 
 type DashboardConfig struct {

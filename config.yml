@@ -5,6 +5,10 @@ http:
 https:
   address: ":443"
 
+rate_limit:
+  requests_per_second: 1000
+  burst: 3000
+
 tls:
   certs_dir: /app/certs
   domains:

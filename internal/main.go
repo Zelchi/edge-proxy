@@ -12,6 +12,7 @@ import (
 	"edge-proxy/internal/proxy"
 	"edge-proxy/internal/server"
 	"edge-proxy/internal/tls"
+	"golang.org/x/time/rate"
 )
 
 func main() {
@@ -50,7 +51,7 @@ func main() {
 		log.Fatal("[FATAL] Falha ao configurar rotas:", err)
 	}
 
-	limiter := proxy.NewLimiter(10, 20)
+	limiter := proxy.NewLimiter(rate.Limit(cfg.RateLimit.RequestsPerSecond), cfg.RateLimit.Burst)
 	metrics := &proxy.Metrics{}
 	applicationHandler := limiter.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[REQUEST] %s %s Host=%s", r.Method, r.URL.Path, r.Host)

@@ -17,6 +17,9 @@ func ValidateReload(current, next *Config) error {
 	if current.HTTPS.Address != next.HTTPS.Address {
 		return fmt.Errorf("https.address changed from %q to %q", current.HTTPS.Address, next.HTTPS.Address)
 	}
+	if current.RateLimit != next.RateLimit {
+		return errors.New("rate_limit configuration changed")
+	}
 	if current.TLS.CertsDir != next.TLS.CertsDir {
 		return fmt.Errorf("tls.certs_dir changed from %q to %q", current.TLS.CertsDir, next.TLS.CertsDir)
 	}

@@ -14,6 +14,12 @@ func (c *Config) Validate() error {
 
 	validationErrors = append(validationErrors, validateAddress("http.address", c.HTTP.Address, true))
 	validationErrors = append(validationErrors, validateAddress("https.address", c.HTTPS.Address, false))
+	if c.RateLimit.RequestsPerSecond <= 0 {
+		validationErrors = append(validationErrors, errors.New("rate_limit.requests_per_second must be greater than zero"))
+	}
+	if c.RateLimit.Burst < 1 {
+		validationErrors = append(validationErrors, errors.New("rate_limit.burst must be at least one"))
+	}
 
 	domains := make(map[string]struct{}, len(c.TLS.Domains))
 	for _, domain := range c.TLS.Domains {
