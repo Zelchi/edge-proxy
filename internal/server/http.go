@@ -5,14 +5,21 @@ import (
 	"time"
 )
 
+const (
+	readHeaderTimeout = 5 * time.Second
+	readTimeout       = 30 * time.Second
+	idleTimeout       = 120 * time.Second
+)
+
 func New(addr string, handler http.Handler) *http.Server {
 	return &http.Server{
 		Addr:              addr,
 		Handler:           handler,
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       0,
-		WriteTimeout:      0,
-		IdleTimeout:       120 * time.Second,
-		MaxHeaderBytes:    1 << 20,
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		// Keep this unset so long-lived streamed responses are not cut off.
+		WriteTimeout:   0,
+		IdleTimeout:    idleTimeout,
+		MaxHeaderBytes: 1 << 20,
 	}
 }

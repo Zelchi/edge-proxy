@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY go.mod go.sum ./
 COPY ./internal ./internal
+COPY config.yml ./
 
 RUN go mod tidy
 
@@ -14,6 +15,7 @@ FROM alpine:3.19
 WORKDIR /app
 
 RUN apk add --no-cache ca-certificates
-COPY --from=builder /app .
+COPY --from=builder /app/main /app/main
+COPY --from=builder /app/config.yml /app/config.yml
 
 ENTRYPOINT ["/app/main"]

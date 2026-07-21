@@ -22,10 +22,9 @@ func NewManager(certs string, domains []string) *Manager {
 }
 
 func (m *Manager) TLSConfig() *tls.Config {
-	return &tls.Config{
-		GetCertificate: m.autocert.GetCertificate,
-		MinVersion:     tls.VersionTLS12,
-	}
+	config := m.autocert.TLSConfig()
+	config.MinVersion = tls.VersionTLS12
+	return config
 }
 
 func (m *Manager) HTTPHandler(next http.Handler) http.Handler {

@@ -8,16 +8,21 @@ https:
 tls:
   certs_dir: /app/certs
   domains:
-    - zelchi.com
-    - pesquisa.zelchi.com
-    - envolve.zelchi.com
+    - info.zelchi.com
+    - vtt.zelchi.com
+    - foundry.zelchi.com
+    - foundry14.zelchi.com
+    - foundry13.zelchi.com
+
+dashboard:
+  host: info.zelchi.com
 
 routes:
-  - host: zelchi.com
-    upstream: http://zelchi-blog:3001
-
-  - host: pesquisa.zelchi.com
-    upstream: http://pesquisa-hardware:3002
-
-  - host: envolve.zelchi.com
-    upstream: http://envolve-dev:3003
+  - host: vtt.zelchi.com
+    upstream: http://172.17.0.1:9333
+  - host: foundry.zelchi.com
+    upstream: http://172.17.0.1:30001
+  - host: foundry14.zelchi.com
+    upstream: http://172.17.0.1:30000
+  - host: foundry13.zelchi.com
+    upstream: http://172.17.0.1:30001

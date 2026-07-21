@@ -1,0 +1,8 @@
+# Build artifacts
+out/
+
+# Local TLS / ACME material
+certs/
+
+# Local environment overrides
+.env
