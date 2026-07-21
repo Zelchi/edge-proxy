@@ -9,6 +9,7 @@ tls:
   certs_dir: /app/certs
   domains:
     - info.zelchi.com
+    - solar.zelchi.com
     - vtt.zelchi.com
     - foundry.zelchi.com
     - foundry14.zelchi.com
@@ -16,6 +17,10 @@ tls:
 
 dashboard:
   host: info.zelchi.com
+
+fallback:
+  host: solar.zelchi.com
+  status_code: 308
 
 routes:
   - host: vtt.zelchi.com
