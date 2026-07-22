@@ -1,21 +1,16 @@
-# Edge Proxy (Go)
+# Edge Proxy
 
-Edge Proxy é um reverse proxy / edge server escrito em Go, com foco em simplicidade, baixo consumo de recursos e suporte nativo a HTTPS automático via Let’s Encrypt (ACME).
+Reverse proxy em Go para expor múltiplos serviços por domínio, com HTTPS automático, HTTP/3, redirecionamento HTTP → HTTPS, rate limit e dashboard simples.
 
-- - -
-### Principais funcionalidades
-- Reverse proxy baseado em host (Host header)
-- HTTPS automático (Let’s Encrypt / ACME)
-- Redirecionamento HTTP → HTTPS
-- Rate limiting básico
-- Suporte a múltiplos domínios
-- Certificados persistentes via volume
-- - -
+## Requisitos
 
-Configure pelo `config.yml`. Consulte a seção de reload para saber quais
-alterações exigem reinício do container.
+- Docker e Docker Compose
+- DNS dos domínios apontando para o IP público do servidor
+- Portas TCP `80` e `443`, e UDP `443`, liberadas
 
-### Configuração
+## Configuração rápida
+
+Edite o [config.yml](config.yml):
 
 ```yaml
 http:
@@ -25,12 +20,25 @@ http:
 https:
   address: ":443"
 
+rate_limit:
+  requests_per_second: 100
+  burst: 200
+
 tls:
-  certs_dir: /app/certs
+  # Cache dos certificados emitidos automaticamente pelo Let's Encrypt.
+  certs_dir: /app/autocert
   domains:
     - app.exemplo.com
+    - painel.exemplo.com
+    - api.exemplo.com
 
-# Opcional: hosts sem rota são redirecionados para este domínio.
+  # Opcional: diretório com fullchain.pem e privkey.pem.
+  # Necessário para aceitar e redirecionar subdomínios HTTPS desconhecidos.
+  certs_fallback: /app/certs
+
+dashboard:
+  host: painel.exemplo.com
+
 fallback:
   host: app.exemplo.com
   status_code: 302
@@ -38,84 +46,117 @@ fallback:
 routes:
   - host: app.exemplo.com
     upstream: http://app:8080
-    # Opcional. Por padrão o upstream recebe seu host interno.
+  - host: api.exemplo.com
+    upstream: http://api:3000
     preserve_host: false
 ```
 
-Todos os hosts são normalizados para minúsculas, sem ponto final. Cada host de
-rota HTTPS precisa estar em `tls.domains`; upstreams aceitam somente `http` ou
-`https` e precisam ter host. Um `fallback.host` deve ser uma rota ou domínio TLS
-conhecido.
+Regras importantes:
 
-O fallback preserva path e query string. Em HTTPS, um host desconhecido precisa
-ter certificado válido antes do redirecionamento ser possível; por isso, para
-subdomínios variáveis, use domínios explícitos ou uma solução de certificado
-curinga com DNS-01.
+- Todo `routes[].host` HTTPS precisa constar em `tls.domains`.
+- `dashboard.host` também precisa constar em `tls.domains`.
+- Hosts são tratados em minúsculas e sem ponto final.
+- Os upstreams aceitam somente `http://` ou `https://`.
+- `preserve_host: true` envia o host público original ao upstream. Por padrão, o upstream recebe o próprio host interno.
 
-### Uso rápido
+### Onde está o upstream?
 
-1. Ajuste `config.yml` com os domínios, upstreams e, se desejar, o fallback.
-2. Garanta que os DNS dos domínios apontem para este servidor e que TCP/80,
-   TCP/443 e UDP/443 estejam liberados.
-3. Inicie com Compose:
+- Outro serviço no mesmo `compose.yml`: use o nome do serviço, por exemplo `http://api:3000`.
+- Serviço executando no host do servidor, ou porta publicada por outro container: use `http://host.docker.internal:3000`.
 
-   ```bash
-   docker network create proxy_network
-   docker compose up -d --build
-   ```
+O Compose mapeia `host.docker.internal` para o gateway do host no Linux. O
+Podman também disponibiliza esse nome e o alias `host.containers.internal`.
+Evite `172.17.0.1`: esse IP depende da configuração da bridge e pode mudar.
 
-4. Verifique a disponibilidade:
+## Iniciar com Docker Compose
 
-   ```bash
-   curl -i http://localhost/healthz
-   ```
-
-Para executar sem Compose, crie a imagem e monte a configuração e um diretório
-persistente para os certificados:
+Suba o proxy:
 
 ```bash
-docker build -t edge-proxy .
-docker run -d --name edge-proxy \
-  -p 80:80 -p 443:443 -p 443:443/udp \
-  -v "$(pwd)/config.yml:/app/config.yml:ro" \
-  -v edge-proxy-certs:/app/certs \
-  edge-proxy
+docker compose up -d --build
 ```
 
-### Reload de configuração
+Com Podman, use o equivalente:
 
-O proxy recarrega alterações de `routes`, `fallback` e
-`http.redirect_to_https` sem interromper requisições em andamento. Alterações em
-`http.address`, `https.address`, `tls.certs_dir` ou `tls.domains` exigem reinício
-do container; o reload será rejeitado e a configuração anterior continuará ativa.
+```bash
+podman compose up -d --build
+```
 
-### Protocolos HTTP
+Verifique os logs:
 
-O proxy disponibiliza HTTP/1.1 e HTTP/2 em TCP/443, além de HTTP/3 em UDP/443.
-O navegador negocia o melhor protocolo disponível: HTTP/3 é anunciado por
-`Alt-Svc`, mas clientes sem QUIC/UDP usam HTTP/2 ou HTTP/1.1 automaticamente.
+```bash
+docker compose logs -f edge-proxy
+```
 
-### Caminho do upstream
+O Compose usa automaticamente a rede bridge padrão do projeto.
 
-Um caminho em `upstream` é usado como prefixo. Por exemplo,
-`upstream: http://api:8080/base` encaminha uma requisição para `/users` ao
-backend como `/base/users`. Query string e fragmento não são aceitos no
-upstream; a query da requisição do cliente é preservada.
+O Compose expõe:
 
-### Health check
+- HTTP em TCP `80`
+- HTTPS/HTTP2 em TCP `443`
+- HTTP/3 em UDP `443`
 
-`GET /healthz` responde `200 ok` em HTTP ou HTTPS sem expor configuração ou
-estado interno. Use-o para liveness/readiness no Docker ou no balanceador.
+## Certificados
 
-### Dashboard
+### Domínios configurados
 
-O host definido em `dashboard.host` serve uma página somente leitura com
-requisições, erros 5xx e transferência de entrada/saída. Acesse o host
-configurado em `dashboard.host`; a API de métricas fica em `GET /api/metrics` e
-não aceita métodos de alteração.
+Para os domínios em `tls.domains`, o proxy obtém e guarda certificados Let's Encrypt automaticamente. O desafio HTTP-01 usa a porta 80; os domínios precisam resolver para o servidor.
 
-### Imagem Docker
+### Certificado curinga para fallback HTTPS
 
-A imagem já inclui o `config.yml` presente no build e pode ser executada sem
-Compose. Monte outro arquivo em `/app/config.yml` para substituir a configuração
-em runtime; o Compose já faz isso automaticamente.
+Um host HTTPS desconhecido só pode receber redirect se o proxy tiver um certificado válido para ele. Para isso, emita um certificado curinga, por exemplo para `exemplo.com` e `*.exemplo.com`, usando DNS-01:
+
+```bash
+sudo certbot certonly --manual --preferred-challenges dns \
+  -d exemplo.com -d '*.exemplo.com'
+```
+
+O Certbot exibirá valores TXT para `_acme-challenge.exemplo.com`. No painel do
+provedor DNS, o campo **Host** normalmente deve ser apenas `_acme-challenge`.
+
+Após emitir ou renovar, copie os PEMs para a pasta `certs` na raiz do projeto:
+
+```bash
+sudo install -m 644 /etc/letsencrypt/live/exemplo.com/fullchain.pem certs/fullchain.pem
+sudo install -m 600 /etc/letsencrypt/live/exemplo.com/privkey.pem certs/privkey.pem
+```
+
+A pasta `certs` é montada no container como `/app/certs`, não é incluída na imagem e é ignorada pelo Git. O proxy detecta alterações nesses dois arquivos e usa o certificado novo em novas conexões TLS, sem rebuild ou reinício.
+
+Certificados emitidos com `certbot --manual` não renovam sozinhos. Repita o processo antes da data de expiração e copie novamente os dois arquivos.
+
+## Fallback
+
+Quando um host não possui rota, o proxy redireciona para `fallback.host`, preservando caminho e query string:
+
+```text
+http://desconhecido.exemplo.com/docs?lang=pt
+→ https://app.exemplo.com/docs?lang=pt
+```
+
+Em HTTPS, isso funciona para hosts cobertos pelo certificado curinga configurado em `certs_fallback`. Sem ele, o navegador encerra a conexão durante o handshake TLS antes de qualquer redirect HTTP ser possível.
+
+O próprio `fallback.host` não é redirecionado novamente, evitando loop. Ele precisa ter uma rota ou ser atendido pelo dashboard.
+
+## Health e dashboard
+
+- `GET /healthz` retorna `200 ok` por HTTP ou HTTPS.
+- O host definido em `dashboard.host` exibe o dashboard.
+- `GET /api/metrics` retorna métricas em JSON no host do dashboard.
+
+## Reload de configuração
+
+Alterações em `routes`, `fallback` e `http.redirect_to_https` são recarregadas automaticamente.
+
+Alterações em endereços de escuta, rate limit ou configuração TLS exigem reiniciar o container:
+
+```bash
+docker compose up -d --build
+```
+
+## Testes
+
+```bash
+go test ./...
+go test -race ./...
+```

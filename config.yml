@@ -10,14 +10,13 @@ rate_limit:
   burst: 3000
 
 tls:
-  certs_dir: /app/certs
+  certs_dir: /app/autocert
+  certs_fallback: /app/certs
   domains:
     - info.zelchi.com
     - solar.zelchi.com
     - vtt.zelchi.com
     - foundry.zelchi.com
-    - foundry14.zelchi.com
-    - foundry13.zelchi.com
 
 dashboard:
   host: info.zelchi.com
@@ -28,10 +27,6 @@ fallback:
 
 routes:
   - host: vtt.zelchi.com
-    upstream: http://172.17.0.1:9333
+    upstream: http://host.docker.internal:9333
   - host: foundry.zelchi.com
-    upstream: http://172.17.0.1:30001
-  - host: foundry14.zelchi.com
-    upstream: http://172.17.0.1:30000
-  - host: foundry13.zelchi.com
-    upstream: http://172.17.0.1:30001
+    upstream: http://host.docker.internal:30001

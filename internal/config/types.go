@@ -20,8 +20,9 @@ type HTTPSConfig struct {
 }
 
 type TLSConfig struct {
-	CertsDir string   `yaml:"certs_dir"`
-	Domains  []string `yaml:"domains"`
+	CertsDir      string   `yaml:"certs_dir"`
+	CertsFallback string   `yaml:"certs_fallback"`
+	Domains       []string `yaml:"domains"`
 }
 
 type RateLimitConfig struct {

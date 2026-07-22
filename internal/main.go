@@ -23,10 +23,14 @@ func main() {
 	}
 	configSnapshot := config.NewSnapshot(cfg)
 
-	tlsManager := tls.NewManager(
+	tlsManager, err := tls.NewManager(
 		cfg.TLS.CertsDir,
 		cfg.TLS.Domains,
+		cfg.TLS.CertsFallback,
 	)
+	if err != nil {
+		log.Fatal("[FATAL] Falha ao inicializar TLS:", err)
+	}
 	log.Println("[BOOT] TLS Manager inicializado.")
 
 	router := proxy.NewRouter()
@@ -54,7 +58,6 @@ func main() {
 	limiter := proxy.NewLimiter(rate.Limit(cfg.RateLimit.RequestsPerSecond), cfg.RateLimit.Burst)
 	metrics := &proxy.Metrics{}
 	applicationHandler := limiter.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("[REQUEST] %s %s Host=%s", r.Method, r.URL.Path, r.Host)
 		router.ServeHTTP(w, r)
 	}))
 	dashboardHandler := server.WithDashboard(cfg.Dashboard.Host, metrics, applicationHandler)
@@ -86,7 +89,6 @@ func main() {
 			http.Redirect(w, r, "https://"+r.Host+r.URL.RequestURI(), http.StatusMovedPermanently)
 			return
 		}
-		log.Printf("[HTTP] Processando %s%s", r.Host, r.RequestURI)
 		router.ServeHTTPRedirect(w, r)
 	})
 

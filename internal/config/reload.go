@@ -23,6 +23,9 @@ func ValidateReload(current, next *Config) error {
 	if current.TLS.CertsDir != next.TLS.CertsDir {
 		return fmt.Errorf("tls.certs_dir changed from %q to %q", current.TLS.CertsDir, next.TLS.CertsDir)
 	}
+	if current.TLS.CertsFallback != next.TLS.CertsFallback {
+		return errors.New("tls.certs_fallback changed")
+	}
 	if !sameStrings(current.TLS.Domains, next.TLS.Domains) {
 		return errors.New("tls.domains changed")
 	}

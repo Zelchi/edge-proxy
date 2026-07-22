@@ -16,11 +16,11 @@ func TestLimiterExpiresInactiveEntries(t *testing.T) {
 	now = now.Add(2 * time.Minute)
 	limiter.get("new")
 
-	if _, exists := limiter.limiters["old"]; exists {
+	if limiter.has("old") {
 		t.Fatal("expired limiter entry was retained")
 	}
-	if len(limiter.limiters) != 1 {
-		t.Fatalf("entries = %d, want 1", len(limiter.limiters))
+	if entries := limiter.entryCount(); entries != 1 {
+		t.Fatalf("entries = %d, want 1", entries)
 	}
 }
 
@@ -33,12 +33,24 @@ func TestLimiterEvictsOldestEntryAtCapacity(t *testing.T) {
 	now = now.Add(time.Second)
 	limiter.get("third")
 
-	if _, exists := limiter.limiters["first"]; exists {
+	if limiter.has("first") {
 		t.Fatal("oldest limiter entry was retained at capacity")
 	}
-	if len(limiter.limiters) != 2 {
-		t.Fatalf("entries = %d, want 2", len(limiter.limiters))
+	if entries := limiter.entryCount(); entries != 2 {
+		t.Fatalf("entries = %d, want 2", entries)
 	}
+}
+
+func (l *Limiter) has(ip string) bool {
+	shard := &l.shards[limiterShardIndex(ip)]
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
+	_, exists := shard.limiters[ip]
+	return exists
+}
+
+func (l *Limiter) entryCount() int {
+	return int(l.entries.Load())
 }
 
 func TestClientIPDoesNotUseAnEmptyKey(t *testing.T) {

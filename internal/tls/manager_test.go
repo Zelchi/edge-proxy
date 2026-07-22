@@ -6,7 +6,10 @@ import (
 )
 
 func TestTLSConfigPreservesAutocertProtocols(t *testing.T) {
-	manager := NewManager(t.TempDir(), []string{"app.example"})
+	manager, err := NewManager(t.TempDir(), []string{"app.example"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
 	config := manager.TLSConfig()
 
 	if config.MinVersion != cryptotls.VersionTLS12 {
@@ -17,6 +20,12 @@ func TestTLSConfigPreservesAutocertProtocols(t *testing.T) {
 	}
 	if !containsProtocol(config.NextProtos, "h2") || !containsProtocol(config.NextProtos, "http/1.1") {
 		t.Fatalf("NextProtos = %q, want HTTP/2 and HTTP/1.1", config.NextProtos)
+	}
+}
+
+func TestNewManagerRejectsIncompleteFallbackCertificate(t *testing.T) {
+	if _, err := NewManager(t.TempDir(), []string{"app.example"}, t.TempDir()); err == nil {
+		t.Fatal("NewManager accepted an incomplete fallback certificate")
 	}
 }
 

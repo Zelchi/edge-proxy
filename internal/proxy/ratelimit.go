@@ -4,21 +4,31 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/time/rate"
 )
 
+const limiterShardCount = 64
+
 type Limiter struct {
-	limiters     map[string]*clientLimiter
-	mu           sync.Mutex
 	rate         rate.Limit
 	burst        int
 	ttl          time.Duration
 	maxEntries   int
-	lastCleanup  time.Time
 	cleanupEvery time.Duration
 	now          func() time.Time
+	shards       [limiterShardCount]limiterShard
+	entries      atomic.Int64
+	lastCleanup  atomic.Int64
+	cleaning     atomic.Bool
+	evictionMu   sync.Mutex
+}
+
+type limiterShard struct {
+	limiters map[string]*clientLimiter
+	mu       sync.Mutex
 }
 
 type clientLimiter struct {
@@ -34,8 +44,7 @@ func newLimiter(r rate.Limit, b int, ttl time.Duration, maxEntries int, now func
 	if maxEntries < 1 {
 		maxEntries = 1
 	}
-	return &Limiter{
-		limiters:     make(map[string]*clientLimiter),
+	limiter := &Limiter{
 		rate:         r,
 		burst:        b,
 		ttl:          ttl,
@@ -43,49 +52,119 @@ func newLimiter(r rate.Limit, b int, ttl time.Duration, maxEntries int, now func
 		cleanupEvery: time.Minute,
 		now:          now,
 	}
-}
-
-func (l *Limiter) get(ip string) *rate.Limiter {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	now := l.now()
-	if now.Sub(l.lastCleanup) >= l.cleanupEvery {
-		l.cleanupExpired(now)
-		l.lastCleanup = now
+	for index := range limiter.shards {
+		limiter.shards[index].limiters = make(map[string]*clientLimiter)
 	}
-
-	if entry, exists := l.limiters[ip]; exists {
-		entry.lastSeen = now
-		return entry.limiter
-	}
-
-	if len(l.limiters) >= l.maxEntries {
-		l.evictOldest()
-	}
-	limiter := rate.NewLimiter(l.rate, l.burst)
-	l.limiters[ip] = &clientLimiter{limiter: limiter, lastSeen: now}
 	return limiter
 }
 
-func (l *Limiter) cleanupExpired(now time.Time) {
-	for ip, entry := range l.limiters {
-		if now.Sub(entry.lastSeen) >= l.ttl {
-			delete(l.limiters, ip)
+func (l *Limiter) get(ip string) *rate.Limiter {
+	now := l.now()
+	l.cleanupExpired(now)
+
+	shard := &l.shards[limiterShardIndex(ip)]
+	shard.mu.Lock()
+	if entry, exists := shard.limiters[ip]; exists {
+		entry.lastSeen = now
+		shard.mu.Unlock()
+		return entry.limiter
+	}
+	shard.mu.Unlock()
+
+	for !l.reserveEntry() {
+		l.evictOldest()
+	}
+
+	shard.mu.Lock()
+	if entry, exists := shard.limiters[ip]; exists {
+		entry.lastSeen = now
+		shard.mu.Unlock()
+		l.entries.Add(-1)
+		return entry.limiter
+	}
+	limiter := rate.NewLimiter(l.rate, l.burst)
+	shard.limiters[ip] = &clientLimiter{limiter: limiter, lastSeen: now}
+	shard.mu.Unlock()
+	return limiter
+}
+
+func (l *Limiter) reserveEntry() bool {
+	for {
+		entries := l.entries.Load()
+		if entries >= int64(l.maxEntries) {
+			return false
+		}
+		if l.entries.CompareAndSwap(entries, entries+1) {
+			return true
 		}
 	}
 }
 
+func (l *Limiter) cleanupExpired(now time.Time) {
+	lastCleanup := time.Unix(0, l.lastCleanup.Load())
+	if l.cleanupEvery > 0 && now.Sub(lastCleanup) < l.cleanupEvery {
+		return
+	}
+	if !l.cleaning.CompareAndSwap(false, true) {
+		return
+	}
+	defer l.cleaning.Store(false)
+
+	lastCleanup = time.Unix(0, l.lastCleanup.Load())
+	if l.cleanupEvery > 0 && now.Sub(lastCleanup) < l.cleanupEvery {
+		return
+	}
+	for index := range l.shards {
+		shard := &l.shards[index]
+		shard.mu.Lock()
+		for ip, entry := range shard.limiters {
+			if now.Sub(entry.lastSeen) >= l.ttl {
+				delete(shard.limiters, ip)
+				l.entries.Add(-1)
+			}
+		}
+		shard.mu.Unlock()
+	}
+	l.lastCleanup.Store(now.UnixNano())
+}
+
 func (l *Limiter) evictOldest() {
+	l.evictionMu.Lock()
+	defer l.evictionMu.Unlock()
+
 	var oldestIP string
 	var oldestTime time.Time
-	for ip, entry := range l.limiters {
-		if oldestIP == "" || entry.lastSeen.Before(oldestTime) {
-			oldestIP = ip
-			oldestTime = entry.lastSeen
+	var oldestShard *limiterShard
+	for index := range l.shards {
+		shard := &l.shards[index]
+		shard.mu.Lock()
+		for ip, entry := range shard.limiters {
+			if oldestIP == "" || entry.lastSeen.Before(oldestTime) {
+				oldestIP = ip
+				oldestTime = entry.lastSeen
+				oldestShard = shard
+			}
 		}
+		shard.mu.Unlock()
 	}
-	delete(l.limiters, oldestIP)
+	if oldestShard == nil {
+		return
+	}
+	oldestShard.mu.Lock()
+	if _, exists := oldestShard.limiters[oldestIP]; exists {
+		delete(oldestShard.limiters, oldestIP)
+		l.entries.Add(-1)
+	}
+	oldestShard.mu.Unlock()
+}
+
+func limiterShardIndex(ip string) uint64 {
+	var hash uint64 = 14695981039346656037
+	for index := range len(ip) {
+		hash ^= uint64(ip[index])
+		hash *= 1099511628211
+	}
+	return hash & (limiterShardCount - 1)
 }
 
 func (l *Limiter) Middleware(next http.Handler) http.Handler {
