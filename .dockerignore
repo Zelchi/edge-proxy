@@ -1,6 +1,5 @@
 .git
 .gitignore
-*.md
-compose*.yml
-config*.yml
-.gitignore
+.env
+out
+certs

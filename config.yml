@@ -5,11 +5,28 @@ http:
 https:
   address: ":443"
 
+rate_limit:
+  requests_per_second: 1000
+  burst: 3000
+
 tls:
-  certs_dir: /app/certs
+  certs_dir: /app/autocert
+  certs_fallback: /app/certs
   domains:
+    - info.zelchi.com
+    - solar.zelchi.com
     - vtt.zelchi.com
+    - foundry.zelchi.com
+
+dashboard:
+  host: info.zelchi.com
+
+fallback:
+  host: solar.zelchi.com
+  status_code: 302
 
 routes:
   - host: vtt.zelchi.com
     upstream: http://host.docker.internal:9333
+  - host: foundry.zelchi.com
+    upstream: http://host.docker.internal:30001

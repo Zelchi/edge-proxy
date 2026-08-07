@@ -1,14 +1,40 @@
 package proxy
 
 import (
+	"net"
 	"net/http"
 	"time"
 )
 
+const (
+	dialTimeout           = 5 * time.Second
+	dialKeepAlive         = 30 * time.Second
+	tlsHandshakeTimeout   = 5 * time.Second
+	responseHeaderTimeout = 30 * time.Second
+	expectContinueTimeout = time.Second
+	idleConnTimeout       = 90 * time.Second
+	maxIdleConns          = 200
+	maxIdleConnsPerHost   = 50
+)
+
+var defaultTransport = newDefaultTransport()
+
+// DefaultTransport is shared by every route so idle connections can be reused
+// even when multiple public hosts use the same upstream.
 func DefaultTransport() *http.Transport {
+	return defaultTransport
+}
+
+func newDefaultTransport() *http.Transport {
 	return &http.Transport{
-		MaxIdleConns:        200,
-		IdleConnTimeout:     90 * time.Second,
-		TLSHandshakeTimeout: 5 * time.Second,
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           (&net.Dialer{Timeout: dialTimeout, KeepAlive: dialKeepAlive}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          maxIdleConns,
+		MaxIdleConnsPerHost:   maxIdleConnsPerHost,
+		IdleConnTimeout:       idleConnTimeout,
+		TLSHandshakeTimeout:   tlsHandshakeTimeout,
+		ResponseHeaderTimeout: responseHeaderTimeout,
+		ExpectContinueTimeout: expectContinueTimeout,
 	}
 }

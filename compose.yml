@@ -5,11 +5,17 @@ services:
     build:
       context: .
       dockerfile: dockerfile
+    container_name: edge-proxy
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp"
     volumes:
-      - certs:/app/certs
+      - certs:/app/autocert
+      - ./certs:/app/certs:ro,Z
       - ./config.yml:/app/config.yml:Z
     extra_hosts:
       - "host.docker.internal:host-gateway"
