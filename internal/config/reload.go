@@ -5,8 +5,6 @@ import (
 	"fmt"
 )
 
-// ValidateReload rejects changes that cannot take effect without replacing the
-// running listeners or TLS manager.
 func ValidateReload(current, next *Config) error {
 	if current == nil || next == nil {
 		return errors.New("current and next configurations are required")

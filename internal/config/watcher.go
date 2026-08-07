@@ -11,8 +11,6 @@ import (
 
 const configReloadDebounce = 100 * time.Millisecond
 
-// WatchConfig watches the parent directory so updates made by replacing the
-// config file (the usual atomic-save pattern) are detected too.
 func WatchConfig(ctx context.Context, path string, onChange func()) error {
 	return watchConfig(ctx, path, onChange, nil)
 }

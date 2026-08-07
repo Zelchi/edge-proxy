@@ -12,7 +12,7 @@ import (
 
 type Router struct {
 	mu     sync.Mutex
-	routes atomic.Value // routingTable
+	routes atomic.Value
 }
 
 type routingTable struct {
@@ -45,19 +45,14 @@ func (r *Router) Clear() {
 	r.Replace(nil)
 }
 
-// Replace atomically publishes a complete routing table. Requests already being
-// proxied continue with their selected route, while new requests use this table.
 func (r *Router) Replace(routes map[string]*httputil.ReverseProxy) {
 	r.ReplaceWithOptions(routes, Fallback{}, false)
 }
 
-// ReplaceWithFallback atomically publishes a complete routing table and the
-// fallback used for unknown hosts.
 func (r *Router) ReplaceWithFallback(routes map[string]*httputil.ReverseProxy, fallback Fallback) {
 	r.ReplaceWithOptions(routes, fallback, false)
 }
 
-// ReplaceWithOptions atomically publishes all request-routing behavior.
 func (r *Router) ReplaceWithOptions(routes map[string]*httputil.ReverseProxy, fallback Fallback, redirectToHTTPS bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -99,8 +94,6 @@ func (r *Router) HasRoute(host string) bool {
 	return ok
 }
 
-// ServeHTTPRedirect handles a plaintext HTTP request using the same atomic
-// routing snapshot as HTTPS requests.
 func (r *Router) ServeHTTPRedirect(w http.ResponseWriter, req *http.Request) {
 	table := r.routes.Load().(routingTable)
 	if _, ok := table.routes[normalizeHost(req.Host)]; !ok {

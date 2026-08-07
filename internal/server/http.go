@@ -17,9 +17,8 @@ func New(addr string, handler http.Handler) *http.Server {
 		Handler:           handler,
 		ReadHeaderTimeout: readHeaderTimeout,
 		ReadTimeout:       readTimeout,
-		// Keep this unset so long-lived streamed responses are not cut off.
-		WriteTimeout:   0,
-		IdleTimeout:    idleTimeout,
-		MaxHeaderBytes: 1 << 20,
+		WriteTimeout:      0,
+		IdleTimeout:       idleTimeout,
+		MaxHeaderBytes:    1 << 20,
 	}
 }

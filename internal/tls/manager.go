@@ -76,9 +76,6 @@ func newFallbackCertificate(certFile, keyFile string) (*fallbackCertificate, err
 	return fallback, nil
 }
 
-// load returns the latest valid certificate. If a certificate is being replaced
-// and its files are momentarily inconsistent, the previous certificate remains
-// available until the new pair can be loaded successfully.
 func (f *fallbackCertificate) load() *tls.Certificate {
 	certState, keyState, err := certificateStates(f.certFile, f.keyFile)
 	if err != nil {

@@ -68,8 +68,6 @@ type metricsResponseWriter struct {
 
 func (w *metricsResponseWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 
-// Hijack preserves protocol upgrades while measuring bytes that bypass the
-// normal HTTP request and response bodies, such as WebSocket frames.
 func (w *metricsResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	hijacker, ok := w.ResponseWriter.(http.Hijacker)
 	if !ok {

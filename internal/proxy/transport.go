@@ -19,8 +19,6 @@ const (
 
 var defaultTransport = newDefaultTransport()
 
-// DefaultTransport is shared by every route so idle connections can be reused
-// even when multiple public hosts use the same upstream.
 func DefaultTransport() *http.Transport {
 	return defaultTransport
 }

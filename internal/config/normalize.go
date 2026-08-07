@@ -2,7 +2,6 @@ package config
 
 import "strings"
 
-// Normalize canonicalizes host names before validation and publication.
 func (c *Config) Normalize() {
 	for index := range c.TLS.Domains {
 		c.TLS.Domains[index] = normalizeHostname(c.TLS.Domains[index])

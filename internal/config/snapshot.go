@@ -2,8 +2,6 @@ package config
 
 import "sync/atomic"
 
-// Snapshot safely publishes immutable configuration instances to concurrent
-// request handlers.
 type Snapshot struct {
 	value atomic.Pointer[Config]
 }
