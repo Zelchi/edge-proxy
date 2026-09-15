@@ -22,8 +22,7 @@ type routingTable struct {
 }
 
 type Fallback struct {
-	Host       string
-	StatusCode int
+	Host string
 }
 
 func NewRouter() *Router {
@@ -96,11 +95,23 @@ func (r *Router) HasRoute(host string) bool {
 
 func (r *Router) ServeHTTPRedirect(w http.ResponseWriter, req *http.Request) {
 	table := r.routes.Load().(routingTable)
+	serveHTTPRedirect(w, req, table, table.redirectToHTTPS)
+}
+
+// ServeHTTPRedirectWithPolicy applies the supplied redirect policy to this
+// request while using the current routing table. It is useful when multiple
+// HTTP listeners have different redirect policies.
+func (r *Router) ServeHTTPRedirectWithPolicy(w http.ResponseWriter, req *http.Request, redirectToHTTPS bool) {
+	table := r.routes.Load().(routingTable)
+	serveHTTPRedirect(w, req, table, redirectToHTTPS)
+}
+
+func serveHTTPRedirect(w http.ResponseWriter, req *http.Request, table routingTable, redirectToHTTPS bool) {
 	if _, ok := table.routes[normalizeHost(req.Host)]; !ok {
 		serveUnknownHost(w, req, table.fallback)
 		return
 	}
-	if !table.redirectToHTTPS {
+	if !redirectToHTTPS {
 		http.NotFound(w, req)
 		return
 	}
@@ -130,13 +141,6 @@ func serveUnknownHost(w http.ResponseWriter, req *http.Request, fallback Fallbac
 }
 
 func redirectToFallback(w http.ResponseWriter, req *http.Request, fallback Fallback) {
-	status := fallback.StatusCode
-	switch status {
-	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
-	default:
-		status = http.StatusFound
-	}
-
 	target := url.URL{
 		Scheme:   "https",
 		Host:     fallback.Host,
@@ -145,5 +149,5 @@ func redirectToFallback(w http.ResponseWriter, req *http.Request, fallback Fallb
 		RawQuery: req.URL.RawQuery,
 	}
 	w.Header().Set("Cache-Control", "no-store")
-	http.Redirect(w, req, target.String(), status)
+	http.Redirect(w, req, target.String(), http.StatusFound)
 }

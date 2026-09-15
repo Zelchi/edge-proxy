@@ -1,162 +1,158 @@
 # Edge Proxy
 
-Reverse proxy em Go para expor múltiplos serviços por domínio, com HTTPS automático, HTTP/3, redirecionamento HTTP → HTTPS, rate limit e dashboard simples.
+Proxy de borda multiprotocolo em Go para expor serviços HTTP, HTTPS, TCP e UDP
+por um único ponto de entrada. Inclui HTTP/3, certificados automáticos,
+redirecionamento HTTP para HTTPS, rate limit, métricas e dashboard.
 
-## Requisitos
+## Configuração
 
-- Docker e Docker Compose
-- DNS dos domínios apontando para o IP público do servidor
-- Portas TCP `80` e `443`, e UDP `443`, liberadas
-
-## Configuração rápida
-
-Edite o [config.yml](config.yml):
+Edite o `config.yml`:
 
 ```yaml
+rate_limit:
+  requests_per_second: 1000
+  burst: 3000
+
 http:
   address: ":80"
   redirect_to_https: true
+  dashboard: painel.exemplo.com
+  fallback: app.exemplo.com
+  routes:
+    - host: app.exemplo.com
+      upstream: http://application:3000
 
 https:
   address: ":443"
+  tls:
+    certs_dir: /app/autocert
+    certs_fallback: /app/certs
+    domains:
+      - painel.exemplo.com
+      - app.exemplo.com
 
-rate_limit:
-  requests_per_second: 100
-  burst: 200
+tcp:
+  address: ":25000"
+  routes:
+    - host: service-a.example.com
+      upstream: backend-a:25565
+    - host: service-b.example.com
+      upstream: backend-b:25565
 
-tls:
-  # Cache dos certificados emitidos automaticamente pelo Let's Encrypt.
-  certs_dir: /app/autocert
-  domains:
-    - app.exemplo.com
-    - painel.exemplo.com
-    - api.exemplo.com
-
-  # Opcional: diretório com fullchain.pem e privkey.pem.
-  # Necessário para aceitar e redirecionar subdomínios HTTPS desconhecidos.
-  certs_fallback: /app/certs
-
-dashboard:
-  host: painel.exemplo.com
-
-fallback:
-  host: app.exemplo.com
-  status_code: 302
-
-routes:
-  - host: app.exemplo.com
-    upstream: http://app:8080
-  - host: api.exemplo.com
-    upstream: http://api:3000
-    preserve_host: false
+udp:
+  address: ":19000"
+  routes:
+    - host: service.example.com
+      upstream: backend:19132
 ```
 
-Regras importantes:
+`http.dashboard`, `http.fallback` e os hosts de `http.routes` são strings
+simples. O fallback sempre responde com `302 Found` e não possui status
+configurável.
 
-- Todo `routes[].host` HTTPS precisa constar em `tls.domains`.
-- `dashboard.host` também precisa constar em `tls.domains`.
-- Hosts são tratados em minúsculas e sem ponto final.
-- Os upstreams aceitam somente `http://` ou `https://`.
-- `preserve_host: true` envia o host público original ao upstream. Por padrão, o upstream recebe o próprio host interno.
+Rotas HTTP aceitam somente upstreams com `http://` ou `https://`. Por padrão,
+o upstream recebe o próprio host interno; `preserve_host: true` mantém o host
+público.
 
-### Onde está o upstream?
+## TCP
 
-- Outro serviço no mesmo `compose.yml`: use o nome do serviço, por exemplo `http://api:3000`.
-- Serviço executando no host do servidor, ou porta publicada por outro container: use `http://host.docker.internal:3000`.
+O TCP é transparente depois da seleção da rota. Quando `routes` é usado, o
+roteador padrão lê o preâmbulo inicial para obter o hostname e encaminha os
+bytes originais. Um hostname desconhecido é rejeitado, a menos que exista
+`default_upstream`:
 
-O Compose mapeia `host.docker.internal` para o gateway do host no Linux. O
-Podman também disponibiliza esse nome e o alias `host.containers.internal`.
-Evite `172.17.0.1`: esse IP depende da configuração da bridge e pode mudar.
+```yaml
+tcp:
+  address: ":25000"
+  routes:
+    - host: service-a.example.com
+      upstream: backend-a:25565
+  default_upstream: backend-default:25565
+```
 
-## Iniciar com Docker Compose
+Para encaminhar todo o tráfego para um único destino, use o roteador estático:
 
-Suba o proxy:
+```yaml
+tcp:
+  address: ":27015"
+  router: static
+  upstream: game-server:27015
+```
+
+Upstreams TCP usam apenas `host:porta`, sem prefixo de esquema.
+
+## UDP
+
+O UDP cria uma sessão por endereço de cliente, encaminhando datagramas para o
+upstream. As sessões expiram por inatividade e podem ser limitadas com
+`max_sessions`:
+
+```yaml
+udp:
+  address: ":19000"
+  upstream: game-server:19132
+  max_sessions: 4096
+```
+
+Também é possível declarar uma única rota UDP. O protocolo UDP não carrega o
+hostname usado no DNS, portanto várias rotas por domínio na mesma porta não
+podem ser distinguidas.
+
+A porta UDP `443` é reservada ao HTTP/3.
+
+## Docker e Podman
+
+Publique no host as portas configuradas:
+
+```yaml
+ports:
+  - "80:80"
+  - "443:443/tcp"
+  - "443:443/udp"
+  - "25000:25000/tcp"
+  - "19000:19000/udp"
+```
+
+Para serviços em outros containers, use o nome do serviço na mesma rede. Para
+serviços no host, use `host.docker.internal` no Docker ou
+`host.containers.internal` no Podman. `localhost` dentro do proxy é o próprio
+container, não o host nem outro container.
+
+Inicie com:
 
 ```bash
 docker compose up -d --build
 ```
 
-Com Podman, use o equivalente:
+Ou:
 
 ```bash
 podman compose up -d --build
 ```
 
-Verifique os logs:
-
-```bash
-docker compose logs -f edge-proxy
-```
-
-O Compose usa automaticamente a rede bridge padrão do projeto.
-
-O Compose expõe:
-
-- HTTP em TCP `80`
-- HTTPS/HTTP2 em TCP `443`
-- HTTP/3 em UDP `443`
-
 ## Certificados
 
-### Domínios configurados
+Os domínios em `https.tls.domains` usam o cache automático do Let's Encrypt.
+`https.tls.certs_fallback` deve conter `fullchain.pem` e `privkey.pem` quando
+for necessário atender domínios cobertos por um certificado alternativo.
 
-Para os domínios em `tls.domains`, o proxy obtém e guarda certificados Let's Encrypt automaticamente. O desafio HTTP-01 usa a porta 80; os domínios precisam resolver para o servidor.
+A pasta `certs/` na raiz é montada em `/app/certs` e não é incluída na imagem.
 
-### Certificado curinga para fallback HTTPS
+## Dashboard e métricas
 
-Um host HTTPS desconhecido só pode receber redirect se o proxy tiver um certificado válido para ele. Para isso, emita um certificado curinga, por exemplo para `exemplo.com` e `*.exemplo.com`, usando DNS-01:
+- `GET /healthz` retorna `200 ok`;
+- `GET /api/metrics` retorna métricas em JSON;
+- `/api/metrics/stream` envia atualizações por SSE a cada cinco segundos;
+- o dashboard exibe requisições HTTP, tráfego, erros e estatísticas TCP/UDP.
 
-```bash
-sudo certbot certonly --manual --preferred-challenges dns \
-  -d exemplo.com -d '*.exemplo.com'
-```
+Endereços de clientes não são usados como labels de métricas.
 
-O Certbot exibirá valores TXT para `_acme-challenge.exemplo.com`. No painel do
-provedor DNS, o campo **Host** normalmente deve ser apenas `_acme-challenge`.
+## Reload
 
-Após emitir ou renovar, copie os PEMs para a pasta `certs` na raiz do projeto:
-
-```bash
-sudo install -m 644 /etc/letsencrypt/live/exemplo.com/fullchain.pem certs/fullchain.pem
-sudo install -m 600 /etc/letsencrypt/live/exemplo.com/privkey.pem certs/privkey.pem
-```
-
-A pasta `certs` é montada no container como `/app/certs`, não é incluída na imagem e é ignorada pelo Git. O proxy detecta alterações nesses dois arquivos e usa o certificado novo em novas conexões TLS, sem rebuild ou reinício.
-
-Certificados emitidos com `certbot --manual` não renovam sozinhos. Repita o processo antes da data de expiração e copie novamente os dois arquivos.
-
-## Fallback
-
-Quando um host não possui rota, o proxy redireciona para `fallback.host`, preservando caminho e query string:
-
-```text
-http://desconhecido.exemplo.com/docs?lang=pt
-→ https://app.exemplo.com/docs?lang=pt
-```
-
-Em HTTPS, isso funciona para hosts cobertos pelo certificado curinga configurado em `certs_fallback`. Sem ele, o navegador encerra a conexão durante o handshake TLS antes de qualquer redirect HTTP ser possível.
-
-O próprio `fallback.host` não é redirecionado novamente, evitando loop. Ele precisa ter uma rota ou ser atendido pelo dashboard.
-
-## Health e dashboard
-
-- `GET /healthz` retorna `200 ok` por HTTP ou HTTPS.
-- O host definido em `dashboard.host` exibe o dashboard.
-- `GET /api/metrics` retorna métricas em JSON no host do dashboard.
-
-## Reload de configuração
-
-Alterações em `routes`, `fallback` e `http.redirect_to_https` são recarregadas automaticamente.
-
-Alterações em endereços de escuta, rate limit ou configuração TLS exigem reiniciar o container:
+Alterações em rotas HTTP, fallback e `http.redirect_to_https` são recarregadas
+automaticamente. Alterações em endereços, rate limit, TLS ou roteamento
+TCP/UDP exigem reinício:
 
 ```bash
-docker compose up -d --build
-```
-
-## Testes
-
-```bash
-go test ./...
-go test -race ./...
+docker compose restart edge-proxy
 ```

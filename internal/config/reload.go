@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"reflect"
 )
 
 func ValidateReload(current, next *Config) error {
@@ -15,17 +16,26 @@ func ValidateReload(current, next *Config) error {
 	if current.HTTPS.Address != next.HTTPS.Address {
 		return fmt.Errorf("https.address changed from %q to %q", current.HTTPS.Address, next.HTTPS.Address)
 	}
+	if current.HTTP.Dashboard != next.HTTP.Dashboard {
+		return fmt.Errorf("http.dashboard changed from %q to %q", current.HTTP.Dashboard, next.HTTP.Dashboard)
+	}
 	if current.RateLimit != next.RateLimit {
 		return errors.New("rate_limit configuration changed")
 	}
-	if current.TLS.CertsDir != next.TLS.CertsDir {
-		return fmt.Errorf("tls.certs_dir changed from %q to %q", current.TLS.CertsDir, next.TLS.CertsDir)
+	if current.HTTPS.TLS.CertsDir != next.HTTPS.TLS.CertsDir {
+		return fmt.Errorf("https.tls.certs_dir changed from %q to %q", current.HTTPS.TLS.CertsDir, next.HTTPS.TLS.CertsDir)
 	}
-	if current.TLS.CertsFallback != next.TLS.CertsFallback {
-		return errors.New("tls.certs_fallback changed")
+	if current.HTTPS.TLS.CertsFallback != next.HTTPS.TLS.CertsFallback {
+		return errors.New("https.tls.certs_fallback changed")
 	}
-	if !sameStrings(current.TLS.Domains, next.TLS.Domains) {
-		return errors.New("tls.domains changed")
+	if !sameStrings(current.HTTPS.TLS.Domains, next.HTTPS.TLS.Domains) {
+		return errors.New("https.tls.domains changed")
+	}
+	if !reflect.DeepEqual(current.TCP, next.TCP) {
+		return errors.New("tcp configuration changed; restart is required")
+	}
+	if !reflect.DeepEqual(current.UDP, next.UDP) {
+		return errors.New("udp configuration changed; restart is required")
 	}
 	return nil
 }

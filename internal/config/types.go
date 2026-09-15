@@ -1,22 +1,24 @@
 package config
 
 type Config struct {
+	RateLimit RateLimitConfig `yaml:"rate_limit"`
 	HTTP      HTTPConfig      `yaml:"http"`
 	HTTPS     HTTPSConfig     `yaml:"https"`
-	TLS       TLSConfig       `yaml:"tls"`
-	RateLimit RateLimitConfig `yaml:"rate_limit"`
-	Dashboard DashboardConfig `yaml:"dashboard"`
-	Routes    []Route         `yaml:"routes"`
-	Fallback  FallbackConfig  `yaml:"fallback"`
+	TCP       TCPConfig       `yaml:"tcp"`
+	UDP       UDPConfig       `yaml:"udp"`
 }
 
 type HTTPConfig struct {
-	Address         string `yaml:"address"`
-	RedirectToHTTPS bool   `yaml:"redirect_to_https"`
+	Address         string  `yaml:"address"`
+	RedirectToHTTPS bool    `yaml:"redirect_to_https"`
+	Dashboard       string  `yaml:"dashboard"`
+	Routes          []Route `yaml:"routes"`
+	Fallback        string  `yaml:"fallback"`
 }
 
 type HTTPSConfig struct {
-	Address string `yaml:"address"`
+	Address string    `yaml:"address"`
+	TLS     TLSConfig `yaml:"tls"`
 }
 
 type TLSConfig struct {
@@ -30,17 +32,36 @@ type RateLimitConfig struct {
 	Burst             int     `yaml:"burst"`
 }
 
-type DashboardConfig struct {
-	Host string `yaml:"host"`
-}
-
 type Route struct {
 	Host         string `yaml:"host"`
 	Upstream     string `yaml:"upstream"`
 	PreserveHost bool   `yaml:"preserve_host"`
 }
 
-type FallbackConfig struct {
-	Host       string `yaml:"host"`
-	StatusCode int    `yaml:"status_code"`
+type TCPConfig struct {
+	Address         string           `yaml:"address"`
+	Router          string           `yaml:"router"`
+	Upstream        string           `yaml:"upstream"`
+	DefaultUpstream string           `yaml:"default_upstream"`
+	MaxConnections  int              `yaml:"max_connections"`
+	Routes          []TCPRouteConfig `yaml:"routes"`
+}
+
+type TCPRouteConfig struct {
+	Host     string `yaml:"host"`
+	Upstream string `yaml:"upstream"`
+}
+
+type UDPConfig struct {
+	Address         string           `yaml:"address"`
+	Router          string           `yaml:"router"`
+	Upstream        string           `yaml:"upstream"`
+	DefaultUpstream string           `yaml:"default_upstream"`
+	MaxSessions     int              `yaml:"max_sessions"`
+	Routes          []UDPRouteConfig `yaml:"routes"`
+}
+
+type UDPRouteConfig struct {
+	Host     string `yaml:"host"`
+	Upstream string `yaml:"upstream"`
 }

@@ -1,32 +1,45 @@
-http:
-  address: ":80"
-  redirect_to_https: true
-
-https:
-  address: ":443"
-
 rate_limit:
   requests_per_second: 1000
   burst: 3000
 
-tls:
-  certs_dir: /app/autocert
-  certs_fallback: /app/certs
-  domains:
-    - info.zelchi.com
-    - solar.zelchi.com
-    - vtt.zelchi.com
-    - foundry.zelchi.com
+http:
+  address: ":80"
+  redirect_to_https: true
+  dashboard: info.zelchi.com
+  fallback: solar.zelchi.com
+  routes:
+    - host: drive.zelchi.com
+      upstream: http://host.docker.internal:7000
+    - host: vtt.zelchi.com
+      upstream: http://host.docker.internal:9333
+    - host: foundry.zelchi.com
+      upstream: http://host.docker.internal:30001
+    - host: hunt.zelchi.com
+      upstream: http://host.docker.internal:9222
 
-dashboard:
-  host: info.zelchi.com
+https:
+  address: ":443"
+  tls:
+    certs_dir: /app/autocert
+    certs_fallback: /app/certs
+    domains:
+      - info.zelchi.com
+      - solar.zelchi.com
+      - vtt.zelchi.com
+      - foundry.zelchi.com
+      - hunt.zelchi.com
+      - drive.zelchi.com
 
-fallback:
-  host: solar.zelchi.com
-  status_code: 302
+tcp:
+  address: ":25000"
+  routes:
+    - host: minecraft.zelchi.com
+      upstream: host.docker.internal:25565
+    - host: pumpkin.zelchi.com
+      upstream: host.docker.internal:25566
 
-routes:
-  - host: vtt.zelchi.com
-    upstream: http://host.docker.internal:9333
-  - host: foundry.zelchi.com
-    upstream: http://host.docker.internal:30001
+udp:
+  address: ":19000"
+  routes:
+    - host: pumpkin.zelchi.com
+      upstream: host.docker.internal:19132

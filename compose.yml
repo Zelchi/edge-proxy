@@ -9,8 +9,10 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "80:80"
-      - "443:443"
+      - "443:443/tcp"
       - "443:443/udp"
+      - "25000:25000/tcp"
+      - "19000:19000/udp"
     volumes:
       - certs:/app/autocert
       - ./certs:/app/certs:ro,Z

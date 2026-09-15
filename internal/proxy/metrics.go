@@ -13,17 +13,36 @@ type Metrics struct {
 	errors   atomic.Uint64
 	inBytes  atomic.Uint64
 	outBytes atomic.Uint64
+	streams  atomic.Pointer[StreamMetrics]
 }
 
 type MetricsSnapshot struct {
-	Requests uint64 `json:"requests"`
-	Errors   uint64 `json:"errors"`
-	InBytes  uint64 `json:"in_bytes"`
-	OutBytes uint64 `json:"out_bytes"`
+	Requests uint64                   `json:"requests"`
+	Errors   uint64                   `json:"errors"`
+	InBytes  uint64                   `json:"in_bytes"`
+	OutBytes uint64                   `json:"out_bytes"`
+	Streams  []StreamListenerSnapshot `json:"streams"`
 }
 
 func (m *Metrics) Snapshot() MetricsSnapshot {
-	return MetricsSnapshot{m.requests.Load(), m.errors.Load(), m.inBytes.Load(), m.outBytes.Load()}
+	return MetricsSnapshot{
+		Requests: m.requests.Load(),
+		Errors:   m.errors.Load(),
+		InBytes:  m.inBytes.Load(),
+		OutBytes: m.outBytes.Load(),
+		Streams:  m.StreamMetrics().Snapshot(),
+	}
+}
+
+func (m *Metrics) StreamMetrics() *StreamMetrics {
+	if metrics := m.streams.Load(); metrics != nil {
+		return metrics
+	}
+	metrics := NewStreamMetrics()
+	if m.streams.CompareAndSwap(nil, metrics) {
+		return metrics
+	}
+	return m.streams.Load()
 }
 
 func WithMetrics(metrics *Metrics, next http.Handler) http.Handler {
