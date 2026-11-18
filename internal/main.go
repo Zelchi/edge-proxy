@@ -261,9 +261,9 @@ func startTURNProxyListeners(cfg *config.Config, metrics *proxy.StreamMetrics, l
 	if cfg.TURN.PublicIP == "" {
 		return nil, nil
 	}
-	key := []byte(os.Getenv("LUNA_TURN_PROXY_SECRET"))
+	key := []byte(os.Getenv("TURN_PROXY_SECRET"))
 	if len(key) < 32 {
-		return nil, errors.New("LUNA_TURN_PROXY_SECRET must contain at least 32 characters when turn proxying is enabled")
+		return nil, errors.New("TURN_PROXY_SECRET must contain at least 32 characters when turn proxying is enabled")
 	}
 	publicIP := net.ParseIP(cfg.TURN.PublicIP).To4()
 	if publicIP == nil {
