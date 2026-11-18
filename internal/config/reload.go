@@ -37,9 +37,6 @@ func ValidateReload(current, next *Config) error {
 	if !reflect.DeepEqual(current.UDP, next.UDP) {
 		return errors.New("udp configuration changed; restart is required")
 	}
-	if !reflect.DeepEqual(current.TURN, next.TURN) {
-		return errors.New("turn configuration changed; restart is required")
-	}
 	return nil
 }
 

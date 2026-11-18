@@ -18,8 +18,6 @@ const (
 	maxUDPDatagramSize    = 64 * 1024
 )
 
-type UDPDatagramTransform func(data []byte, client, local *net.UDPAddr) ([]byte, error)
-
 var errMaxUDPSessions = errors.New("maximum UDP sessions reached")
 
 type UDPListener struct {
@@ -27,7 +25,6 @@ type UDPListener struct {
 	upstream     string
 	maxSessions  int
 	idleTimeout  time.Duration
-	transform    UDPDatagramTransform
 	metrics      *proxy.StreamListenerMetrics
 	logger       *slog.Logger
 	mu           sync.Mutex
@@ -46,10 +43,6 @@ type udpSession struct {
 }
 
 func NewUDPListener(address, upstream string, maxSessions int, metrics *proxy.StreamListenerMetrics, logger *slog.Logger) (*UDPListener, error) {
-	return NewUDPListenerWithTransform(address, upstream, maxSessions, udpSessionIdleTimeout, nil, metrics, logger)
-}
-
-func NewUDPListenerWithTransform(address, upstream string, maxSessions int, idleTimeout time.Duration, transform UDPDatagramTransform, metrics *proxy.StreamListenerMetrics, logger *slog.Logger) (*UDPListener, error) {
 	listenAddress, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
 		return nil, err
@@ -61,9 +54,6 @@ func NewUDPListenerWithTransform(address, upstream string, maxSessions int, idle
 	if maxSessions <= 0 {
 		maxSessions = defaultUDPMaxSessions
 	}
-	if idleTimeout <= 0 {
-		idleTimeout = udpSessionIdleTimeout
-	}
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -71,8 +61,7 @@ func NewUDPListenerWithTransform(address, upstream string, maxSessions int, idle
 		connection:  connection,
 		upstream:    upstream,
 		maxSessions: maxSessions,
-		idleTimeout: idleTimeout,
-		transform:   transform,
+		idleTimeout: udpSessionIdleTimeout,
 		metrics:     metrics,
 		logger:      logger,
 		sessions:    make(map[string]*udpSession),
@@ -112,20 +101,7 @@ func (s *UDPListener) Serve(ctx context.Context) error {
 			continue
 		}
 		session.touch(s.idleTimeout)
-		datagram := buffer[:count]
-		if s.transform != nil {
-			localAddress, ok := s.connection.LocalAddr().(*net.UDPAddr)
-			if !ok {
-				s.logger.Error("UDP listener has an unexpected local address")
-				continue
-			}
-			datagram, err = s.transform(datagram, clientAddress, localAddress)
-			if err != nil {
-				s.logger.Debug("UDP datagram transform rejected", "client", clientAddress.String(), "error", err)
-				continue
-			}
-		}
-		written, err := session.upstream.Write(datagram)
+		written, err := session.upstream.Write(buffer[:count])
 		if err != nil {
 			if session.metrics != nil {
 				session.metrics.Error()
