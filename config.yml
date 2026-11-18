@@ -1,6 +1,6 @@
 rate_limit:
-  requests_per_second: 1000
-  burst: 3000
+  requests_per_second: 25
+  burst: 50
 
 http:
   address: ":80"
