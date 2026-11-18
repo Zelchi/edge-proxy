@@ -7,12 +7,18 @@ services:
       dockerfile: dockerfile
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    environment:
+      LUNA_TURN_PROXY_SECRET: "${LUNA_TURN_PROXY_SECRET:?LUNA_TURN_PROXY_SECRET must be set}"
     ports:
       - "80:80"
       - "443:443/tcp"
       - "443:443/udp"
       - "25000:25000/tcp"
       - "19000:19000/udp"
+      - "10.0.0.175:3478:3478/tcp"
+      - "10.0.0.175:3478:3478/udp"
+      - "10.0.0.175:49160-49259:49160-49259/udp"
+      - "172.17.0.1:60160-60259:49160-49259/udp"
     volumes:
       - certs:/app/autocert
       - ./certs:/app/certs:ro,Z

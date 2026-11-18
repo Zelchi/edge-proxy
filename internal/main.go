@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -21,6 +23,7 @@ import (
 	"edge-proxy/internal/server"
 	"edge-proxy/internal/stream"
 	"edge-proxy/internal/tls"
+	"edge-proxy/internal/turnproxy"
 
 	"golang.org/x/time/rate"
 )
@@ -245,6 +248,91 @@ func startStreamListeners(cfg *config.Config, metrics *proxy.StreamMetrics, logg
 		listeners = append(listeners, listener)
 		log.Printf("[UDP] Servidor UDP ouvindo em %s", cfg.UDP.Address)
 	}
+	turnListeners, err := startTURNProxyListeners(cfg, metrics, logger)
+	if err != nil {
+		closeListeners()
+		return nil, err
+	}
+	listeners = append(listeners, turnListeners...)
+	return listeners, nil
+}
+
+func startTURNProxyListeners(cfg *config.Config, metrics *proxy.StreamMetrics, logger *slog.Logger) ([]streamServer, error) {
+	if cfg.TURN.PublicIP == "" {
+		return nil, nil
+	}
+	key := []byte(os.Getenv("LUNA_TURN_PROXY_SECRET"))
+	if len(key) < 32 {
+		return nil, errors.New("LUNA_TURN_PROXY_SECRET must contain at least 32 characters when turn proxying is enabled")
+	}
+	publicIP := net.ParseIP(cfg.TURN.PublicIP).To4()
+	if publicIP == nil {
+		return nil, errors.New("turn.public_ip must be an IPv4 address")
+	}
+	_, portText, err := net.SplitHostPort(cfg.TURN.TCPAddress)
+	if err != nil {
+		return nil, fmt.Errorf("parse turn.tcp_address: %w", err)
+	}
+	controlPort, err := strconv.Atoi(portText)
+	if err != nil {
+		return nil, fmt.Errorf("parse turn control port: %w", err)
+	}
+
+	listeners := make([]streamServer, 0, cfg.TURN.RelayMaxPort-cfg.TURN.RelayMinPort+3)
+	closeListeners := func() {
+		for _, listener := range listeners {
+			_ = listener.Close()
+		}
+	}
+	tcpRouter := turnproxy.TCPRouter{
+		Upstream:    cfg.TURN.ControlUpstream,
+		PublicIP:    publicIP,
+		PublicPort:  controlPort,
+		ProxySecret: key,
+	}
+	tcpMetrics := metrics.Register("turn-tcp", "", cfg.TURN.TCPAddress, []string{cfg.TURN.ControlUpstream})
+	tcpListener, err := server.NewTCPListener(cfg.TURN.TCPAddress, tcpRouter, cfg.TURN.MaxSessions, tcpMetrics, logger)
+	if err != nil {
+		return nil, fmt.Errorf("open TURN TCP proxy listener: %w", err)
+	}
+	listeners = append(listeners, tcpListener)
+
+	controlTransform := func(data []byte, client, _ *net.UDPAddr) ([]byte, error) {
+		return turnproxy.EncodeDatagram(key, turnproxy.Frame{
+			Type:        turnproxy.ControlUDP,
+			Source:      client,
+			Destination: &net.UDPAddr{IP: publicIP, Port: controlPort},
+			Payload:     data,
+		})
+	}
+	controlMetrics := metrics.Register("turn-udp", "", cfg.TURN.UDPAddress, []string{cfg.TURN.ControlUpstream})
+	controlListener, err := server.NewUDPListenerWithTransform(
+		cfg.TURN.UDPAddress,
+		cfg.TURN.ControlUpstream,
+		cfg.TURN.MaxSessions,
+		15*time.Minute,
+		controlTransform,
+		controlMetrics,
+		logger,
+	)
+	if err != nil {
+		closeListeners()
+		return nil, fmt.Errorf("open TURN UDP proxy listener: %w", err)
+	}
+	listeners = append(listeners, controlListener)
+
+	for port := cfg.TURN.RelayMinPort; port <= cfg.TURN.RelayMaxPort; port++ {
+		upstreamPort := cfg.TURN.RelayUpstreamBasePort + port - cfg.TURN.RelayMinPort
+		upstream := net.JoinHostPort(cfg.TURN.RelayUpstreamHost, strconv.Itoa(upstreamPort))
+		address := net.JoinHostPort("", strconv.Itoa(port))
+		listener, err := server.NewTURNRelayUDPListener(address, upstream, key, publicIP, port, logger)
+		if err != nil {
+			closeListeners()
+			return nil, fmt.Errorf("open TURN relay UDP listener on %d: %w", port, err)
+		}
+		listeners = append(listeners, listener)
+	}
+	log.Printf("[TURN] L4 proxy listening on TCP/UDP %s and UDP relay ports %d-%d", cfg.TURN.TCPAddress, cfg.TURN.RelayMinPort, cfg.TURN.RelayMaxPort)
 	return listeners, nil
 }
 

@@ -6,6 +6,7 @@ type Config struct {
 	HTTPS     HTTPSConfig     `yaml:"https"`
 	TCP       TCPConfig       `yaml:"tcp"`
 	UDP       UDPConfig       `yaml:"udp"`
+	TURN      TURNProxyConfig `yaml:"turn"`
 }
 
 type HTTPConfig struct {
@@ -64,4 +65,17 @@ type UDPConfig struct {
 type UDPRouteConfig struct {
 	Host     string `yaml:"host"`
 	Upstream string `yaml:"upstream"`
+}
+
+type TURNProxyConfig struct {
+	PublicIP               string `yaml:"public_ip"`
+	TCPAddress             string `yaml:"tcp_address"`
+	UDPAddress             string `yaml:"udp_address"`
+	ControlUpstream        string `yaml:"control_upstream"`
+	RelayMinPort           int    `yaml:"relay_min_port"`
+	RelayMaxPort           int    `yaml:"relay_max_port"`
+	RelayUpstreamHost      string `yaml:"relay_upstream_host"`
+	RelayUpstreamBasePort  int    `yaml:"relay_upstream_base_port"`
+	RelayCommandBasePort   int    `yaml:"relay_command_base_port"`
+	MaxSessions            int    `yaml:"max_sessions"`
 }

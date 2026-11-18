@@ -43,3 +43,15 @@ udp:
   routes:
     - host: pumpkin.zelchi.com
       upstream: host.docker.internal:19132
+
+turn:
+  public_ip: 163.176.149.9
+  tcp_address: ":3478"
+  udp_address: ":3478"
+  control_upstream: host.docker.internal:13478
+  relay_min_port: 49160
+  relay_max_port: 49259
+  relay_upstream_host: host.docker.internal
+  relay_upstream_base_port: 59160
+  relay_command_base_port: 60160
+  max_sessions: 4096

@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"edge-proxy/internal/turnproxy"
 )
 
 func (c *Config) Validate() error {
@@ -83,6 +85,7 @@ func (c *Config) Validate() error {
 
 	validationErrors = append(validationErrors, validateTCPConfig(c.TCP)...)
 	validationErrors = append(validationErrors, validateUDPConfig(c.UDP)...)
+	validationErrors = append(validationErrors, validateTURNConfig(c.TURN)...)
 	validationErrors = append(validationErrors, validateAddressConflicts(c)...)
 
 	return errors.Join(validationErrors...)
@@ -107,7 +110,55 @@ func validateAddressConflicts(c *Config) []error {
 			validationErrors = append(validationErrors, errors.New("udp.address uses UDP port 443 reserved by HTTP/3"))
 		}
 	}
+	if hasTURNConfig(c.TURN) {
+		tcpPort, tcpErr := addressPort(c.TURN.TCPAddress)
+		udpPort, udpErr := addressPort(c.TURN.UDPAddress)
+		if tcpErr == nil {
+			for field, address := range map[string]string{
+				"http.address": c.HTTP.Address, "https.address": c.HTTPS.Address, "tcp.address": c.TCP.Address,
+			} {
+				if port, err := addressPort(address); err == nil && port == tcpPort {
+					validationErrors = append(validationErrors, fmt.Errorf("turn.tcp_address conflicts with %s", field))
+				}
+			}
+		}
+		if udpErr == nil {
+			if udpPort == 443 {
+				validationErrors = append(validationErrors, errors.New("turn.udp_address uses UDP port 443 reserved by HTTP/3"))
+			}
+			if port, err := addressPort(c.UDP.Address); err == nil && port == udpPort {
+				validationErrors = append(validationErrors, errors.New("turn.udp_address conflicts with udp.address"))
+			}
+		}
+		for field, address := range map[string]string{"HTTP/3": serverHTTP3Address(), "udp.address": c.UDP.Address} {
+			if port, err := addressPort(address); err == nil && port >= c.TURN.RelayMinPort && port <= c.TURN.RelayMaxPort {
+				validationErrors = append(validationErrors, fmt.Errorf("turn relay range conflicts with %s", field))
+			}
+		}
+		if udpErr == nil && udpPort >= c.TURN.RelayMinPort && udpPort <= c.TURN.RelayMaxPort {
+			validationErrors = append(validationErrors, errors.New("turn.udp_address conflicts with the TURN relay range"))
+		}
+	}
 	return validationErrors
+}
+
+func serverHTTP3Address() string {
+	return ":443"
+}
+
+func addressPort(address string) (int, error) {
+	if address == "" {
+		return 0, errors.New("address is empty")
+	}
+	_, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return 0, err
+	}
+	value, err := strconv.Atoi(port)
+	if err != nil || value < 1 || value > 65535 {
+		return 0, fmt.Errorf("invalid port %q", port)
+	}
+	return value, nil
 }
 
 func validateTCPConfig(config TCPConfig) []error {
@@ -218,6 +269,53 @@ func validateUDPConfig(config UDPConfig) []error {
 	return validationErrors
 }
 
+func validateTURNConfig(config TURNProxyConfig) []error {
+	if !hasTURNConfig(config) {
+		return nil
+	}
+	var validationErrors []error
+	publicIP := net.ParseIP(config.PublicIP)
+	if publicIP == nil || !turnproxy.IsPublicIPv4(publicIP) {
+		validationErrors = append(validationErrors, errors.New("turn.public_ip must be a public IPv4 address"))
+	}
+	validationErrors = append(validationErrors, validateAddress("turn.tcp_address", config.TCPAddress, true))
+	validationErrors = append(validationErrors, validateAddress("turn.udp_address", config.UDPAddress, true))
+	tcpPort, tcpErr := addressPort(config.TCPAddress)
+	udpPort, udpErr := addressPort(config.UDPAddress)
+	if tcpErr == nil && udpErr == nil && tcpPort != udpPort {
+		validationErrors = append(validationErrors, errors.New("turn.tcp_address and turn.udp_address must use the same port"))
+	}
+	validationErrors = append(validationErrors, validateStreamUpstream("turn.control_upstream", config.ControlUpstream))
+	if config.RelayMinPort < 1024 || config.RelayMinPort > 65535 ||
+		config.RelayMaxPort < config.RelayMinPort || config.RelayMaxPort > 65535 {
+		validationErrors = append(validationErrors, errors.New("turn relay port range must be valid"))
+	}
+	if config.RelayUpstreamHost == "" || strings.TrimSpace(config.RelayUpstreamHost) != config.RelayUpstreamHost ||
+		strings.ContainsAny(config.RelayUpstreamHost, ":/ ") {
+		validationErrors = append(validationErrors, errors.New("turn.relay_upstream_host must be a hostname or IP"))
+	}
+	count := config.RelayMaxPort - config.RelayMinPort + 1
+	for field, base := range map[string]int{
+		"turn.relay_upstream_base_port": config.RelayUpstreamBasePort,
+		"turn.relay_command_base_port":  config.RelayCommandBasePort,
+	} {
+		if base < 1 || base+count-1 > 65535 {
+			validationErrors = append(validationErrors, fmt.Errorf("%s range must fit in UDP ports 1-65535", field))
+		}
+	}
+	if config.RelayUpstreamBasePort > 0 && config.RelayCommandBasePort > 0 {
+		upstreamEnd := config.RelayUpstreamBasePort + count - 1
+		commandEnd := config.RelayCommandBasePort + count - 1
+		if config.RelayUpstreamBasePort <= commandEnd && config.RelayCommandBasePort <= upstreamEnd {
+			validationErrors = append(validationErrors, errors.New("TURN relay upstream and command port ranges overlap"))
+		}
+	}
+	if config.MaxSessions < 0 {
+		validationErrors = append(validationErrors, errors.New("turn.max_sessions must not be negative"))
+	}
+	return validationErrors
+}
+
 func validateUDPRoutes(routes []UDPRouteConfig) []error {
 	var validationErrors []error
 	routeHosts := make(map[string]struct{}, len(routes))
@@ -241,6 +339,13 @@ func hasTCPConfig(config TCPConfig) bool {
 
 func hasUDPConfig(config UDPConfig) bool {
 	return config.Address != "" || config.Router != "" || config.Upstream != "" || config.DefaultUpstream != "" || config.MaxSessions != 0 || len(config.Routes) > 0
+}
+
+func hasTURNConfig(config TURNProxyConfig) bool {
+	return config.PublicIP != "" || config.TCPAddress != "" || config.UDPAddress != "" ||
+		config.ControlUpstream != "" || config.RelayMinPort != 0 || config.RelayMaxPort != 0 ||
+		config.RelayUpstreamHost != "" || config.RelayUpstreamBasePort != 0 ||
+		config.RelayCommandBasePort != 0 || config.MaxSessions != 0
 }
 
 func validateStreamUpstream(field, upstream string) error {
