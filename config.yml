@@ -10,12 +10,16 @@ http:
   routes:
     - host: drive.zelchi.com
       upstream: http://host.docker.internal:7000
-    - host: vtt.zelchi.com
-      upstream: http://host.docker.internal:9333
+      preserve_host: true
     - host: foundry.zelchi.com
       upstream: http://host.docker.internal:30001
-    - host: hunt.zelchi.com
-      upstream: http://host.docker.internal:9222
+      preserve_host: true
+    - host: luna.zelchi.com
+      upstream: http://host.docker.internal:7676
+      preserve_host: true
+    - host: retro.zelchi.com
+      upstream: http://host.docker.internal:6767
+      preserve_host: true
 
 https:
   address: ":443"
@@ -25,10 +29,11 @@ https:
     domains:
       - info.zelchi.com
       - solar.zelchi.com
-      - vtt.zelchi.com
       - foundry.zelchi.com
-      - hunt.zelchi.com
       - drive.zelchi.com
+      - luna.zelchi.com
+      - retro.zelchi.com
+      - crash.zelchi.com
 
 tcp:
   address: ":25000"
@@ -37,6 +42,8 @@ tcp:
       upstream: host.docker.internal:25565
     - host: pumpkin.zelchi.com
       upstream: host.docker.internal:25566
+    - host: crash.zelchi.com
+      upstream: host.docker.internal:25567
 
 udp:
   address: ":20000"

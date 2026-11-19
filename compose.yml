@@ -1,7 +1,7 @@
 services:
   edge-proxy:
     container_name: edge-proxy
-    restart: unless-stopped
+    restart: always
     build:
       context: .
       dockerfile: dockerfile
